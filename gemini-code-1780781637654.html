@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Schiaccia il Nicola!</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
+            color: #1e293b;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            text-align: center;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        .container {
+            background: white;
+            padding: 30px 20px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 90%;
+            max-width: 380px;
+        }
+
+        h2 { margin-top: 0; color: #b91c1c; font-size: 24px; text-transform: uppercase; }
+        p { color: #64748b; font-size: 15px; margin-bottom: 5px; }
+        
+        .score-board {
+            font-size: 28px;
+            font-weight: bold;
+            color: #0f172a;
+            background: #f8fafc;
+            padding: 5px 20px;
+            border-radius: 8px;
+            border: 2px solid #e2e8f0;
+            margin-bottom: 20px;
+        }
+
+        /* La Griglia delle buche */
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 80px);
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+
+        /* Le Buche */
+        .hole {
+            width: 80px;
+            height: 80px;
+            background: #475569;
+            border-radius: 50%;
+            /* Ombra interna per dare l'effetto di un buco profondo */
+            box-shadow: inset 0 10px 15px rgba(0,0,0,0.6), 0 2px 0 rgba(255,255,255,0.8);
+            position: relative;
+            overflow: hidden; /* Nasconde l'immagine quando va giù */
+        }
+
+        /* L'immagine (Il "Nicola") */
+        .nicola {
+            width: 70px;
+            height: 70px;
+            background-image: url('foto.png');
+            background-size: cover;
+            background-position: center;
+            background-color: #fca5a5; /* Colore di riserva se l'immagine non carica */
+            border-radius: 50%; /* Rende l'immagine tonda */
+            position: absolute;
+            left: 5px;
+            /* Parte dal basso, fuori vista */
+            bottom: -100%; 
+            transition: bottom 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        /* Quando la buca ha la classe 'up', il Nicola sale su */
+        .hole.up .nicola {
+            bottom: 5px;
+        }
+
+        /* Effetto quando viene colpito */
+        .nicola.bonked {
+            filter: brightness(0.6) sepia(1) hue-rotate(-50deg) saturate(3);
+            transform: scale(0.85);
+            transition: all 0.1s;
+        }
+
+        #win-message {
+            display: none;
+            color: #15803d;
+            font-size: 22px;
+            font-weight: bold;
+            margin-top: 20px;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="game-container">
+        <h2>Schiaccia il Nicola</h2>
+        <p>Devi prenderlo 10 volte. Sii veloce!</p>
+        
+        <div class="score-board" id="score">0 / 10</div>
+
+        <div class="game-grid">
+            <div class="hole"><div class="nicola"></div></div>
+            <div class="hole"><div class="nicola"></div></div>
+            <div class="hole"><div class="nicola"></div></div>
+            <div class="hole"><div class="nicola"></div></div>
+            <div class="hole"><div class="nicola"></div></div>
+            <div class="hole"><div class="nicola"></div></div>
+            <div class="hole"><div class="nicola"></div></div>
+            <div class="hole"><div class="nicola"></div></div>
+            <div class="hole"><div class="nicola"></div></div>
+        </div>
+
+        <div id="win-message">💥 KO Tecnico! Test Superato! 💥</div>
+    </div>
+
+    <script>
+        const holes = document.querySelectorAll('.hole');
+        const scoreBoard = document.getElementById('score');
+        const nicolas = document.querySelectorAll('.nicola');
+        
+        let lastHole;
+        let timeUp = false;
+        let score = 0;
+        let peepTimer;
+
+        // Genera un tempo casuale di permanenza fuori dal buco
+        function randomTime(min, max) {
+            return Math.round(Math.random() * (max - min) + min);
+        }
+
+        // Sceglie una buca casuale (evitando che sia la stessa due volte di fila)
+        function randomHole(holes) {
+            const idx = Math.floor(Math.random() * holes.length);
+            const hole = holes[idx];
+            if (hole === lastHole) {
+                return randomHole(holes);
+            }
+            lastHole = hole;
+            return hole;
+        }
+
+        // Fa spuntare fuori l'immagine
+        function peep() {
+            // Tempo tra i 500 e gli 850 millisecondi (Abbastanza veloce!)
+            const time = randomTime(500, 850); 
+            const hole = randomHole(holes);
+            
+            // Tira su l'immagine
+            hole.classList.add('up');
+            
+            peepTimer = setTimeout(() => {
+                // La ritira giù
+                hole.classList.remove('up');
+                hole.querySelector('.nicola').classList.remove('bonked'); // Resetta l'effetto del colpo
+                
+                // Se il gioco non è finito, continua a farlo spuntare
+                if (!timeUp) peep();
+            }, time);
+        }
+
+        // Gestisce il colpo
+        function bonk(e) {
+            if(!e.isTrusted) return; // Evita finti click da bot/script
+            if(this.classList.contains('bonked')) return; // Evita doppi punti se tocchi due volte in fretta
+
+            score++;
+            this.classList.add('bonked'); // Aggiunge l'effetto visivo del colpo
+            scoreBoard.textContent = score + ' / 10';
+            
+            // Costringe l'immagine a tornare giù subito dopo essere stata colpita
+            setTimeout(() => {
+                this.parentNode.classList.remove('up');
+            }, 100);
+
+            // Condizione di vittoria
+            if (score >= 10) {
+                timeUp = true;
+                clearTimeout(peepTimer);
+                
+                // Nasconde la griglia e mostra la vittoria
+                setTimeout(() => {
+                    document.querySelector('.game-grid').style.display = 'none';
+                    document.querySelector('h2').style.display = 'none';
+                    document.querySelector('p').style.display = 'none';
+                    document.getElementById('win-message').style.display = 'block';
+                }, 400);
+            }
+        }
+
+        // Assegna l'evento 'pointerdown' (funziona sia per click del mouse che per tap sul telefono)
+        nicolas.forEach(nicola => nicola.addEventListener('pointerdown', bonk));
+
+        // Avvia il gioco appena si carica la pagina, con un piccolo ritardo di 1 secondo per farsi trovare pronti
+        window.onload = () => {
+            setTimeout(() => {
+                peep();
+            }, 1000);
+        };
+    </script>
+</body>
+</html>
